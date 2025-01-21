@@ -5,6 +5,7 @@
 (define-constant ERR_NOT_AUTHORIZED (err u100))
 (define-constant ERR_NFT_NOT_FOUND (err u101))
 (define-constant ERR_INVALID_PERCENTAGE (err u102))
+(define-constant ERR_INVALID_INPUT (err u103))
 
 ;; Data Maps
 (define-map nft-royalties 
@@ -104,3 +105,27 @@
             { token-id: token-id }
             { locked-until: (+ burn-block-height lock-period),
               locked-percentage: locked-rate }))))
+
+
+(define-map market-incentives
+    { market-address: principal }
+    { royalty-discount: uint })
+
+(define-public (set-market-incentive (market principal) (discount uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set market-incentives
+            { market-address: market }
+            { royalty-discount: discount }))))
+
+
+(define-private (register-nft-internal (token-id uint) (base-royalty uint))
+    (begin
+        (asserts! (<= base-royalty u100) ERR_INVALID_PERCENTAGE)
+        (map-set nft-royalties
+            { token-id: token-id }
+            { creator: tx-sender, 
+              base-royalty: base-royalty,
+              sale-count: u0,
+              current-royalty: base-royalty })
+        (ok true)))
