@@ -77,3 +77,30 @@
             { tier-level: tier-level }
             { min-price: min-price, 
               royalty-multiplier: multiplier }))))
+
+
+(define-map whitelisted-addresses
+    { address: principal }
+    { discount-percentage: uint })
+
+(define-public (add-to-whitelist (address principal) (discount uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (asserts! (<= discount u50) ERR_INVALID_PERCENTAGE)
+        (ok (map-set whitelisted-addresses
+            { address: address }
+            { discount-percentage: discount }))))
+
+
+(define-map royalty-locks
+    { token-id: uint }
+    { locked-until: uint, 
+      locked-percentage: uint })
+
+(define-public (set-royalty-lock (token-id uint) (lock-period uint) (locked-rate uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set royalty-locks
+            { token-id: token-id }
+            { locked-until: (+ burn-block-height lock-period),
+              locked-percentage: locked-rate }))))
