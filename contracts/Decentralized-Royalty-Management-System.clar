@@ -49,3 +49,31 @@
 ;; Internal Functions
 (define-private (mul-down (a uint) (b uint) (c uint))
     (/ (* a b) (* u100 c)))
+
+
+;; Add new data map for royalty splits
+(define-map royalty-splits
+    { token-id: uint }
+    { beneficiaries: (list 10 principal), 
+      shares: (list 10 uint) })
+
+(define-public (set-royalty-split (token-id uint) (beneficiaries (list 10 principal)) (shares (list 10 uint)))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set royalty-splits
+            { token-id: token-id }
+            { beneficiaries: beneficiaries,
+              shares: shares }))))
+
+
+(define-map royalty-tiers
+    { tier-level: uint }
+    { min-price: uint, royalty-multiplier: uint })
+
+(define-public (set-royalty-tier (tier-level uint) (min-price uint) (multiplier uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set royalty-tiers
+            { tier-level: tier-level }
+            { min-price: min-price, 
+              royalty-multiplier: multiplier }))))
