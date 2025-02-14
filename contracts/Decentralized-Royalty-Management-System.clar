@@ -129,3 +129,128 @@
               sale-count: u0,
               current-royalty: base-royalty })
         (ok true)))
+
+
+
+
+(define-map royalty-boosts
+    { token-id: uint }
+    { boost-start: uint, boost-end: uint, boost-percentage: uint })
+
+(define-public (set-royalty-boost (token-id uint) (duration uint) (boost uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set royalty-boosts
+            { token-id: token-id }
+            { boost-start: burn-block-height,
+              boost-end: (+ burn-block-height duration),
+              boost-percentage: boost }))))
+
+
+
+(define-public (register-multiple-nfts (token-ids (list 50 uint)) (base-royalties (list 50 uint)))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (map register-nft-internal token-ids base-royalties)
+        (ok true)))
+
+
+(define-map royalty-history
+    { token-id: uint, sale-id: uint }
+    { amount: uint, timestamp: uint, buyer: principal, seller: principal })
+
+(define-public (record-royalty-payment (token-id uint) (amount uint) (buyer principal) (seller principal))
+    (let ((sale-count (unwrap! (get sale-count (map-get? nft-royalties { token-id: token-id })) ERR_NFT_NOT_FOUND)))
+        (ok (map-set royalty-history
+            { token-id: token-id, sale-id: sale-count }
+            { amount: amount, 
+              timestamp: burn-block-height,
+              buyer: buyer,
+              seller: seller }))))
+
+
+(define-data-var royalty-paused bool false)
+
+(define-public (toggle-royalty-pause)
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (var-set royalty-paused (not (var-get royalty-paused))))))
+
+
+(define-map collection-royalties
+    { collection-id: uint }
+    { base-royalty: uint, override-individual: bool })
+
+(define-public (set-collection-royalty (collection-id uint) (royalty uint) (override bool))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set collection-royalties
+            { collection-id: collection-id }
+            { base-royalty: royalty, override-individual: override }))))
+
+
+(define-map distribution-schedule
+    { token-id: uint }
+    { interval: uint, last-distribution: uint, auto-distribute: bool })
+
+(define-public (set-distribution-schedule (token-id uint) (interval uint) (auto-distribute bool))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set distribution-schedule
+            { token-id: token-id }
+            { interval: interval,
+              last-distribution: burn-block-height,
+              auto-distribute: auto-distribute }))))
+
+
+(define-map referral-rewards
+    { referrer: principal }
+    { reward-percentage: uint, total-earned: uint })
+
+(define-public (register-referrer (referrer principal) (reward-percentage uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set referral-rewards
+            { referrer: referrer }
+            { reward-percentage: reward-percentage, total-earned: u0 }))))
+
+
+
+(define-map milestone-bonuses
+    { token-id: uint }
+    { sales-target: uint, bonus-percentage: uint, achieved: bool })
+
+(define-public (set-milestone-bonus (token-id uint) (target uint) (bonus uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set milestone-bonuses
+            { token-id: token-id }
+            { sales-target: target,
+              bonus-percentage: bonus,
+              achieved: false }))))
+
+
+
+(define-map market-royalty-caps
+    { market-address: principal }
+    { max-royalty: uint, min-royalty: uint })
+
+(define-public (set-market-caps (market principal) (max uint) (min uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set market-royalty-caps
+            { market-address: market }
+            { max-royalty: max, min-royalty: min }))))
+
+
+(define-map royalty-exemptions
+    { address: principal }
+    { exempt-until: uint, reason: (string-ascii 50) })
+
+(define-public (grant-exemption (address principal) (duration uint) (reason (string-ascii 50)))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set royalty-exemptions
+            { address: address }
+            { exempt-until: (+ burn-block-height duration),
+              reason: reason }))))
