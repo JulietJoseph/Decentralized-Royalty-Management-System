@@ -254,3 +254,137 @@
             { address: address }
             { exempt-until: (+ burn-block-height duration),
               reason: reason }))))
+
+
+;; Define event periods map
+(define-map special-events
+    { event-id: uint }
+    { start-time: uint, end-time: uint, boost-percentage: uint, event-name: (string-ascii 50) })
+
+(define-public (create-special-event (event-id uint) (duration uint) (boost uint) (name (string-ascii 50)))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set special-events
+            { event-id: event-id }
+            { start-time: burn-block-height,
+              end-time: (+ burn-block-height duration),
+              boost-percentage: boost,
+              event-name: name }))))
+
+
+;; Define bundle map
+(define-map royalty-bundles
+    { bundle-id: uint }
+    { token-ids: (list 50 uint), bundle-discount: uint })
+
+(define-public (create-royalty-bundle (bundle-id uint) (tokens (list 50 uint)) (discount uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (asserts! (<= discount u50) ERR_INVALID_PERCENTAGE)
+        (ok (map-set royalty-bundles
+            { bundle-id: bundle-id }
+            { token-ids: tokens,
+              bundle-discount: discount }))))
+
+
+;; Define buyer tiers
+(define-map buyer-tiers
+    { buyer: principal }
+    { purchase-count: uint, tier-level: uint, discount: uint })
+
+(define-read-only (calculate-tier-level (purchase-count uint))
+    (if (>= purchase-count u100)
+        u3
+        (if (>= purchase-count u50)
+            u2
+            (if (>= purchase-count u10)
+                u1
+                u0))))
+
+(define-read-only (calculate-tier-discount (purchase-count uint))
+    (if (>= purchase-count u100)
+        u30
+        (if (>= purchase-count u50)
+            u20
+            (if (>= purchase-count u10)
+                u10
+                u0))))
+
+(define-public (update-buyer-tier (buyer principal))
+    (let ((current-data (default-to 
+            { purchase-count: u0, tier-level: u0, discount: u0 }
+            (map-get? buyer-tiers { buyer: buyer }))))
+        (ok (map-set buyer-tiers
+            { buyer: buyer }
+            { purchase-count: (+ (get purchase-count current-data) u1),
+              tier-level: (calculate-tier-level (+ (get purchase-count current-data) u1)),
+              discount: (calculate-tier-discount (+ (get purchase-count current-data) u1)) }))))
+
+
+;; Define price tiers
+(define-map price-based-royalties
+    { token-id: uint }
+    { tier1-threshold: uint, tier1-royalty: uint,
+      tier2-threshold: uint, tier2-royalty: uint,
+      tier3-threshold: uint, tier3-royalty: uint })
+
+(define-public (set-price-tiers (token-id uint) (t1-threshold uint) (t1-royalty uint)
+                               (t2-threshold uint) (t2-royalty uint)
+                               (t3-threshold uint) (t3-royalty uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set price-based-royalties
+            { token-id: token-id }
+            { tier1-threshold: t1-threshold, tier1-royalty: t1-royalty,
+              tier2-threshold: t2-threshold, tier2-royalty: t2-royalty,
+              tier3-threshold: t3-threshold, tier3-royalty: t3-royalty }))))
+
+
+;; Define distribution schedules
+(define-map royalty-schedules
+    { token-id: uint }
+    { daily-limit: uint, weekly-limit: uint, monthly-limit: uint,
+      last-distribution: uint, total-distributed: uint })
+
+(define-public (set-distribution-limits (token-id uint) (daily uint) (weekly uint) (monthly uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set royalty-schedules
+            { token-id: token-id }
+            { daily-limit: daily,
+              weekly-limit: weekly,
+              monthly-limit: monthly,
+              last-distribution: burn-block-height,
+              total-distributed: u0 }))))
+
+
+
+;; Define community pool
+(define-map community-pool
+    { pool-id: uint }
+    { total-amount: uint, participants: (list 100 principal), share-percentages: (list 100 uint) })
+
+(define-public (create-community-pool (pool-id uint) (participants (list 100 principal)) (shares (list 100 uint)))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set community-pool
+            { pool-id: pool-id }
+            { total-amount: u0,
+              participants: participants,
+              share-percentages: shares }))))
+
+
+;; Define promotional rates
+(define-map promotional-rates
+    { promo-id: uint }
+    { start-block: uint, end-block: uint, discount-rate: uint, active: bool })
+
+(define-public (create-promotion (promo-id uint) (duration uint) (discount uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set promotional-rates
+            { promo-id: promo-id }
+            { start-block: burn-block-height,
+              end-block: (+ burn-block-height duration),
+              discount-rate: discount,
+              active: true }))))
