@@ -388,3 +388,199 @@
               end-block: (+ burn-block-height duration),
               discount-rate: discount,
               active: true }))))
+
+
+(define-map time-based-decay
+    { token-id: uint }
+    { start-time: uint, decay-rate: uint, min-royalty: uint })
+
+(define-public (set-time-decay (token-id uint) (decay-rate uint) (min-royalty uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set time-based-decay
+            { token-id: token-id }
+            { start-time: burn-block-height,
+              decay-rate: decay-rate,
+              min-royalty: min-royalty }))))
+
+
+
+(define-map staking-rewards
+    { staker: principal }
+    { amount-staked: uint, reward-rate: uint, last-claim: uint })
+
+(define-public (stake-royalties (amount uint))
+    (begin
+        (asserts! (> amount u0) ERR_INVALID_INPUT)
+        (ok (map-set staking-rewards
+            { staker: tx-sender }
+            { amount-staked: amount,
+              reward-rate: u5,
+              last-claim: burn-block-height }))))
+
+
+(define-map bulk-transfer-discounts
+    { batch-id: uint }
+    { discount-rate: uint, min-quantity: uint })
+
+(define-public (set-bulk-discount (batch-id uint) (discount uint) (min-qty uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set bulk-transfer-discounts
+            { batch-id: batch-id }
+            { discount-rate: discount,
+              min-quantity: min-qty }))))
+
+
+
+
+(define-map market-conditions
+    { market-id: uint }
+    { volume-threshold: uint, adjustment-rate: uint })
+
+(define-public (set-market-condition (market-id uint) (volume uint) (rate uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set market-conditions
+            { market-id: market-id }
+            { volume-threshold: volume,
+              adjustment-rate: rate }))))
+
+
+
+(define-map loyalty-points
+    { user: principal }
+    { points: uint, tier: uint })
+
+(define-public (award-loyalty-points (user principal) (amount uint))
+    (let ((current-points (default-to u0 (get points (map-get? loyalty-points { user: user })))))
+        (ok (map-set loyalty-points
+            { user: user }
+            { points: (+ current-points amount),
+              tier: (/ current-points u1000) }))))
+
+
+
+(define-map collection-bundles
+    { bundle-id: uint }
+    { collections: (list 10 uint), bundle-rate: uint })
+
+(define-public (create-collection-bundle (bundle-id uint) (collections (list 10 uint)) (rate uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set collection-bundles
+            { bundle-id: bundle-id }
+            { collections: collections,
+              bundle-rate: rate }))))
+
+
+(define-map volume-incentives
+    { trader: principal }
+    { monthly-volume: uint, discount-tier: uint })
+
+(define-public (update-volume-incentives (trader principal) (volume uint))
+    (let ((current-volume (default-to u0 (get monthly-volume (map-get? volume-incentives { trader: trader })))))
+        (ok (map-set volume-incentives
+            { trader: trader }
+            { monthly-volume: (+ current-volume volume),
+              discount-tier: (/ current-volume u10000) }))))
+
+
+(define-map flash-sales
+    { sale-id: uint }
+    { start-time: uint, duration: uint, discount: uint, active: bool })
+
+(define-public (create-flash-sale (sale-id uint) (duration uint) (discount uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set flash-sales
+            { sale-id: sale-id }
+            { start-time: burn-block-height,
+              duration: duration,
+              discount: discount,
+              active: true }))))
+
+
+(define-map insurance-pool
+    { policy-id: uint }
+    { coverage-amount: uint, premium-rate: uint, duration: uint, active: bool })
+
+(define-map insured-nfts
+    { token-id: uint }
+    { policy-id: uint, coverage-start: uint })
+
+(define-public (create-insurance-policy (policy-id uint) (coverage uint) (premium uint) (duration uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set insurance-pool
+            { policy-id: policy-id }
+            { coverage-amount: coverage,
+              premium-rate: premium,
+              duration: duration,
+              active: true }))))
+
+(define-public (insure-nft (token-id uint) (policy-id uint))
+    (begin
+        ;; (asserts! (map-get? insurance-pool { policy-id: policy-id }) ERR_NOT_FOUND)
+        (ok (map-set insured-nfts
+            { token-id: token-id }
+            { policy-id: policy-id,
+              coverage-start: burn-block-height }))))
+
+
+(define-map collaborative-pools
+    { pool-id: uint }
+    { members: (list 20 principal),
+      contribution-weights: (list 20 uint),
+      total-royalties: uint,
+      active: bool })
+
+(define-map pool-distributions
+    { pool-id: uint, member: principal }
+    { last-claim: uint, total-claimed: uint })
+
+(define-public (create-collaborative-pool (pool-id uint) (members (list 20 principal)) (weights (list 20 uint)))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set collaborative-pools
+            { pool-id: pool-id }
+            { members: members,
+              contribution-weights: weights,
+              total-royalties: u0,
+              active: true }))))
+
+
+(define-map royalty-auctions
+    { auction-id: uint }
+    { token-id: uint,
+      start-price: uint,
+      current-price: uint,
+      duration: uint,
+      start-time: uint,
+      highest-bidder: (optional principal) })
+
+(define-map auction-bids
+    { auction-id: uint, bidder: principal }
+    { bid-amount: uint, bid-time: uint })
+
+(define-public (create-royalty-auction (auction-id uint) (token-id uint) (start-price uint) (duration uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set royalty-auctions
+            { auction-id: auction-id }
+            { token-id: token-id,
+              start-price: start-price,
+              current-price: start-price,
+              duration: duration,
+              start-time: burn-block-height,
+              highest-bidder: none }))))
+
+(define-public (place-auction-bid (auction-id uint) (bid-amount uint))
+    (let ((auction (unwrap! (map-get? royalty-auctions { auction-id: auction-id }) (err u200)))
+          (current-price (get current-price auction))
+          (highest-bidder (get highest-bidder auction)))
+        (asserts! (> bid-amount (get current-price auction)) ERR_INVALID_INPUT)
+        (ok (map-set auction-bids
+            { auction-id: auction-id, bidder: tx-sender }
+            { bid-amount: bid-amount,
+              bid-time: burn-block-height }))))
