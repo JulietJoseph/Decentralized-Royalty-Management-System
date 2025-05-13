@@ -584,3 +584,172 @@
             { auction-id: auction-id, bidder: tx-sender }
             { bid-amount: bid-amount,
               bid-time: burn-block-height }))))
+
+
+
+(define-map royalty-campaigns 
+    { campaign-id: uint }
+    { start-block: uint,
+      end-block: uint,
+      boost-multiplier: uint,
+      affected-tokens: (list 50 uint),
+      is-active: bool })
+
+(define-public (create-royalty-campaign 
+    (campaign-id uint) 
+    (duration uint)
+    (multiplier uint)
+    (tokens (list 50 uint)))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (asserts! (> multiplier u100) ERR_INVALID_INPUT)
+        (ok (map-set royalty-campaigns
+            { campaign-id: campaign-id }
+            { start-block: burn-block-height,
+              end-block: (+ burn-block-height duration),
+              boost-multiplier: multiplier,
+              affected-tokens: tokens,
+              is-active: true }))))
+
+(define-read-only (is-token-in-active-campaign (campaign-data { start-block: uint, end-block: uint, boost-multiplier: uint, affected-tokens: (list 50 uint), is-active: bool }) (token-id uint))
+    (and
+        (get is-active campaign-data)
+        (> (get end-block campaign-data) burn-block-height)
+        (is-some (index-of (get affected-tokens campaign-data) token-id))))
+;; (define-read-only (get-campaign-boost (token-id uint))
+;;     (let ((active-campaigns 
+;;             (filter 
+;;                 (lambda (campaign) (is-token-in-active-campaign campaign token-id))
+;;                 (map unwrap-panic (map-get? royalty-campaigns)))))
+;;         (default-to u100 (get boost-multiplier (element-at active-campaigns u0)))))
+
+
+(define-map vesting-schedules
+    { schedule-id: uint }
+    { beneficiary: principal,
+      total-amount: uint,
+      vesting-start: uint,
+      vesting-duration: uint,
+      claimed-amount: uint })
+
+(define-map token-vesting-links
+    { token-id: uint }
+    (list 10 uint))
+
+(define-public (create-vesting-schedule
+    (schedule-id uint)
+    (beneficiary principal)
+    (amount uint)
+    (duration uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set vesting-schedules
+            { schedule-id: schedule-id }
+            { beneficiary: beneficiary,
+              total-amount: amount,
+              vesting-start: burn-block-height,
+              vesting-duration: duration,
+              claimed-amount: u0 }))))
+
+;; (define-read-only (get-vested-amount (schedule-id uint))
+;;     (let ((schedule (unwrap! (map-get? vesting-schedules { schedule-id: schedule-id }) (err u300)))
+;;           (elapsed (- burn-block-height (get vesting-start schedule)))
+;;           (vested (* (get total-amount schedule) elapsed)))
+;;         (/ vested (get vesting-duration schedule))))
+
+
+(define-map active-boosts
+    { token-id: uint }
+    { boost-list: (list 5 uint) })
+
+(define-map boost-details 
+    { boost-id: uint }
+    { multiplier: uint,
+      start-time: uint,
+      end-time: uint,
+      description: (string-ascii 50) })
+
+(define-public (create-stackable-boost 
+    (boost-id uint) 
+    (token-id uint)
+    (multiplier uint)
+    (duration uint)
+    (description (string-ascii 50)))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (asserts! (> multiplier u100) ERR_INVALID_INPUT)
+        (map-set boost-details
+            { boost-id: boost-id }
+            { multiplier: multiplier,
+              start-time: burn-block-height,
+              end-time: (+ burn-block-height duration),
+              description: description })
+        (let ((current-boosts (default-to { boost-list: (list) } 
+                             (map-get? active-boosts { token-id: token-id })))
+              (current-list (get boost-list current-boosts)))
+            (asserts! (< (len current-list) u5) ERR_INVALID_INPUT)
+            (ok (map-set active-boosts
+                { token-id: token-id }
+                { boost-list: (unwrap-panic (as-max-len? (append current-list boost-id) u5)) })))))
+
+(define-read-only (get-total-boost (token-id uint))
+    (let ((boosts (default-to { boost-list: (list) } 
+                  (map-get? active-boosts { token-id: token-id }))))
+        (fold calculate-compound-boost 
+              (get boost-list boosts) 
+              u100)))
+
+(define-private (calculate-compound-boost (boost-id uint) (current-total uint))
+    (let ((boost-info (unwrap! (map-get? boost-details { boost-id: boost-id }) u100)))
+        (if (< burn-block-height (get end-time boost-info))
+            (mul-down current-total (get multiplier boost-info) u100)
+            current-total)))
+
+
+(define-map holder-metrics
+    { holder: principal }
+    { hold-duration: uint,
+      interaction-count: uint,
+      last-activity: uint,
+      tier-level: uint })
+
+(define-map tier-benefits
+    { tier: uint }
+    { royalty-bonus: uint,
+      min-hold-time: uint,
+      min-interactions: uint })
+
+(define-public (setup-tier-benefits (tier uint) (bonus uint) (hold-time uint) (interactions uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (ok (map-set tier-benefits
+            { tier: tier }
+            { royalty-bonus: bonus,
+              min-hold-time: hold-time,
+              min-interactions: interactions }))))
+
+(define-public (record-holder-activity (holder principal))
+    (let ((current-metrics (default-to
+            { hold-duration: u0,
+              interaction-count: u0,
+              last-activity: burn-block-height,
+              tier-level: u0 }
+            (map-get? holder-metrics { holder: holder }))))
+        (ok (map-set holder-metrics
+            { holder: holder }
+            { hold-duration: (+ (get hold-duration current-metrics) u1),
+              interaction-count: (+ (get interaction-count current-metrics) u1),
+              last-activity: burn-block-height,
+              tier-level: (calculate-holder-tier current-metrics) }))))
+
+(define-private (calculate-holder-tier (metrics { hold-duration: uint, interaction-count: uint, last-activity: uint, tier-level: uint }))
+    (if (and (>= (get hold-duration metrics) u1000)
+             (>= (get interaction-count metrics) u50))
+        u3
+        (if (and (>= (get hold-duration metrics) u500)
+                 (>= (get interaction-count metrics) u25))
+            u2
+            (if (and (>= (get hold-duration metrics) u100)
+                     (>= (get interaction-count metrics) u10))
+                u1
+                u0))))
