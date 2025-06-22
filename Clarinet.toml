@@ -5,6 +5,11 @@ authors = []
 telemetry = false
 cache_dir = '.\.cache'
 requirements = []
+[contracts.Cross-Chain-Royalty-Bridge]
+path = 'contracts/Cross-Chain-Royalty-Bridge.clar'
+clarity_version = 3
+epoch = 3.1
+
 [contracts.Decentralized-Royalty-Management-System]
 path = 'contracts/Decentralized-Royalty-Management-System.clar'
 clarity_version = 3

@@ -50,6 +50,11 @@ plan:
     - id: 0
       transactions:
         - emulated-contract-publish:
+            contract-name: Cross-Chain-Royalty-Bridge
+            emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            path: "contracts\\Cross-Chain-Royalty-Bridge.clar"
+            clarity-version: 3
+        - emulated-contract-publish:
             contract-name: Decentralized-Royalty-Management-System
             emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
             path: "contracts\\Decentralized-Royalty-Management-System.clar"
