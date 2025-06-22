@@ -1,5 +1,8 @@
 ;; Royalty Management System - Main Contract
 
+;; External trait for cross-chain bridge contract
+;; (use-trait bridge-contract-trait .bridge-contract-trait.bridge-contract-trait)
+
 ;; Constants
 (define-constant CONTRACT_OWNER tx-sender)
 (define-constant ERR_NOT_AUTHORIZED (err u100))
@@ -753,3 +756,12 @@
                      (>= (get interaction-count metrics) u10))
                 u1
                 u0))))
+    
+(define-public (sync-with-cross-chain-bridge (token-id uint) (bridge-contract principal))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (let ((nft-data (unwrap! (map-get? nft-royalties { token-id: token-id }) ERR_NFT_NOT_FOUND)))
+            ;; (try! (contract-call? bridge-contract register-cross-chain-royalty 
+                ;;   token-id u1 (get creator nft-data) (get base-royalty nft-data))
+                ;;   )
+            (ok true))))
