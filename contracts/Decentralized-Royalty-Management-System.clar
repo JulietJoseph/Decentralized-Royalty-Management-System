@@ -722,6 +722,110 @@
       min-hold-time: uint,
       min-interactions: uint })
 
+(define-constant ERR_INVALID_PARENT (err u104))
+(define-constant ERR_INHERITANCE_DEPTH (err u105))
+(define-constant ERR_CIRCULAR_REFERENCE (err u106))
+
+(define-map nft-inheritance
+    { token-id: uint }
+    { parent-token: (optional uint),
+      inheritance-level: uint,
+      ancestor-chain: (list 10 uint) })
+
+(define-map inheritance-rates
+    { level: uint }
+    { royalty-percentage: uint })
+
+(define-map family-distributions
+    { token-id: uint }
+    { total-distributed: uint,
+      distribution-history: (list 50 { ancestor-id: uint, amount: uint, block: uint }) })
+
+(define-public (setup-inheritance-rates (level uint) (percentage uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (asserts! (<= percentage u50) ERR_INVALID_PERCENTAGE)
+        (ok (map-set inheritance-rates
+            { level: level }
+            { royalty-percentage: percentage }))))
+
+(define-public (register-derivative-nft (new-token-id uint) (parent-token-id uint) (new-royalty uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (let ((parent-data (unwrap! (map-get? nft-inheritance { token-id: parent-token-id }) ERR_INVALID_PARENT))
+              (parent-level (get inheritance-level parent-data))
+              (parent-chain (get ancestor-chain parent-data)))
+            (asserts! (< parent-level u10) ERR_INHERITANCE_DEPTH)
+            (asserts! (is-none (index-of parent-chain new-token-id)) ERR_CIRCULAR_REFERENCE)
+            (try! (register-nft-internal new-token-id new-royalty))
+            (ok (map-set nft-inheritance
+                { token-id: new-token-id }
+                { parent-token: (some parent-token-id),
+                  inheritance-level: (+ parent-level u1),
+                  ancestor-chain: (unwrap-panic (as-max-len? (append parent-chain parent-token-id) u10)) })))))
+
+(define-public (distribute-inheritance-royalties (token-id uint) (sale-amount uint))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
+        (let ((inheritance-data (default-to
+                { parent-token: none, inheritance-level: u0, ancestor-chain: (list) }
+                (map-get? nft-inheritance { token-id: token-id })))
+              (ancestor-chain (get ancestor-chain inheritance-data)))
+            (unwrap! (process-ancestor-payments token-id ancestor-chain sale-amount) 
+                ERR_NFT_NOT_FOUND)
+            (ok true))))
+
+(define-private (process-ancestor-payments (token-id uint) (ancestors (list 10 uint)) (total-amount uint))
+    (begin
+        (fold process-single-ancestor-payment ancestors { token-id: token-id, remaining-amount: total-amount })
+        (ok true)))
+
+(define-private (process-single-ancestor-payment (ancestor-id uint) (context { token-id: uint, remaining-amount: uint }))
+    (let ((inheritance-rate (default-to { royalty-percentage: u5 }
+                            (map-get? inheritance-rates { level: u1 })))
+          (payment-amount (/ (* (get remaining-amount context) (get royalty-percentage inheritance-rate)) u100))
+          (current-distributions (default-to
+                { total-distributed: u0, distribution-history: (list) }
+                (map-get? family-distributions { token-id: (get token-id context) })))
+          (new-history-entry { ancestor-id: ancestor-id, amount: payment-amount, block: burn-block-height })
+          (updated-history (unwrap-panic (as-max-len? 
+                            (append (get distribution-history current-distributions) new-history-entry) u50))))
+        (map-set family-distributions
+            { token-id: (get token-id context) }
+            { total-distributed: (+ (get total-distributed current-distributions) payment-amount),
+              distribution-history: updated-history })
+        { token-id: (get token-id context), remaining-amount: (- (get remaining-amount context) payment-amount) }))
+
+(define-read-only (get-nft-lineage (token-id uint))
+    (map-get? nft-inheritance { token-id: token-id }))
+
+(define-read-only (get-family-tree-earnings (token-id uint))
+    (map-get? family-distributions { token-id: token-id }))
+
+(define-read-only (calculate-inheritance-split (token-id uint) (sale-amount uint))
+    (let ((inheritance-data (default-to
+            { parent-token: none, inheritance-level: u0, ancestor-chain: (list) }
+            (map-get? nft-inheritance { token-id: token-id })))
+          (ancestor-count (len (get ancestor-chain inheritance-data)))
+        ;;   (base-rate (default-to u5 (get royalty-percentage 
+        ;;              (default-to { royalty-percentage: u5 }
+        ;;              (map-get? inheritance-rates { level: u1 }))
+        ;;              )))
+                     )
+        (if (> ancestor-count u0)
+            (/ (* sale-amount u200 ancestor-count) u100)
+            u0)))
+
+(define-public (verify-lineage-integrity (token-id uint))
+    (let ((inheritance-data (unwrap! (map-get? nft-inheritance { token-id: token-id }) ERR_NFT_NOT_FOUND))
+          (ancestor-chain (get ancestor-chain inheritance-data)))
+        (ok (verify-chain-validity ancestor-chain token-id))))
+
+(define-private (verify-chain-validity (chain (list 10 uint)) (current-token uint))
+    (and
+        (< (len chain) u11)
+        (is-none (index-of chain current-token))))
+
 (define-public (setup-tier-benefits (tier uint) (bonus uint) (hold-time uint) (interactions uint))
     (begin
         (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_NOT_AUTHORIZED)
