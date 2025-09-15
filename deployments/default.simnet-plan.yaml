@@ -64,4 +64,9 @@ plan:
             emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
             path: "contracts\\Royalty-Yield-Pools.clar"
             clarity-version: 3
+        - emulated-contract-publish:
+            contract-name: royalty-streaming
+            emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            path: "contracts\\royalty-streaming.clar"
+            clarity-version: 3
       epoch: "3.1"
