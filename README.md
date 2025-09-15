@@ -11,6 +11,9 @@ This system includes functionalities for registering NFTs with a base royalty, u
 - **NFT Registration**: Contract owners can register NFTs with a base royalty percentage.
 - **Dynamic Royalties**: Royalties decrease proportionally with the number of sales, ensuring a fair reward system.
 - **Sale Tracking**: Keeps track of the number of sales for each NFT.
+- **Royalty Streaming**: NEW! Subscription-based creator support with tiered streaming payments.
+- **Creator Subscriptions**: Supporters can subscribe to creators with flexible tier-based commitments.
+- **Streaming Payments**: Automated recurring payments to creators based on subscription tiers.
 - **Error Handling**: Includes robust error handling for unauthorized actions, invalid data, and non-existent NFTs.
 - **Comprehensive Tests**: All functionalities are tested using Vitest.
 
@@ -93,6 +96,88 @@ npm run test
    ```bash
    npm run test
    ```
+
+---
+
+## Royalty Streaming Feature
+
+The **Royalty Streaming** contract introduces a revolutionary subscription-based model for continuous creator support, enabling fans and collectors to establish ongoing financial relationships with content creators through flexible tier-based streaming payments.
+
+### Core Concepts
+
+#### Subscription Tiers
+Creators can establish multiple subscription tiers with different benefits and pricing:
+- **Tier Configuration**: Name, monthly cost, minimum commitment period, and benefit descriptions
+- **Flexible Pricing**: Each tier can have different cost structures and commitment requirements
+- **Benefit Descriptions**: Detailed explanations of what subscribers receive at each level
+
+#### Streaming Subscriptions
+Supporters can subscribe to creators with automated recurring payments:
+- **Automated Payments**: Regular payments processed according to subscription terms
+- **Flexible Commitments**: Variable commitment periods based on tier requirements
+- **Subscriber Controls**: Ability to upgrade, pause, resume, or cancel subscriptions
+
+### Key Functions
+
+#### Creator Functions
+```clarity
+;; Set up subscription tiers
+(create-subscription-tier u1 "Basic Support" u100000 u30 "Monthly updates and early access")
+
+;; Register as creator with streaming profile
+(register-creator-profile "Artist Name" (list u1 u2 u3))
+
+;; Claim accumulated streaming payments
+(claim-stream-payment u1)
+```
+
+#### Subscriber Functions
+```clarity
+;; Subscribe to a creator's stream
+(subscribe-to-stream 'SP123...CREATOR u1 u90) ;; tier-id=1, 90-day commitment
+
+;; Upgrade to higher tier
+(upgrade-subscription 'SP123...CREATOR u2)
+
+;; Pause subscription temporarily
+(pause-subscription 'SP123...CREATOR)
+
+;; Resume paused subscription
+(resume-subscription 'SP123...CREATOR)
+
+;; Cancel subscription entirely
+(cancel-subscription 'SP123...CREATOR)
+```
+
+#### Read-Only Queries
+```clarity
+;; Get tier information
+(get-subscription-tier u1)
+
+;; Check creator profile
+(get-creator-profile 'SP123...CREATOR)
+
+;; View subscription details
+(get-subscription 'SP456...SUBSCRIBER 'SP123...CREATOR)
+
+;; Check stream payment details
+(get-stream-payment u1)
+```
+
+### Integration Benefits
+
+1. **Predictable Revenue**: Creators receive consistent income through subscription commitments
+2. **Fan Engagement**: Direct financial relationship between creators and supporters
+3. **Flexible Tiers**: Multiple support levels accommodate different supporter capacities
+4. **Automated Processing**: Smart contract handles payment processing and tier management
+5. **Transparent Operations**: All transactions and commitments recorded on-chain
+
+### Usage Scenarios
+
+- **Content Creators**: Artists, musicians, and writers can establish fan funding streams
+- **NFT Projects**: Ongoing support for continued development and community building
+- **Gaming**: Support for game developers with tier-based early access and benefits
+- **Educational Content**: Subscription-based learning platforms with progressive access
 
 ---
 
